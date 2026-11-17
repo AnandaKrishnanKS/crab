@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mudcrab-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mudcrab
+      POSTGRES_PASSWORD: mudcrab_password
+      POSTGRES_DB: mudcrab
+    ports:
+      - "5432:5432"
+    volumes:
+      - mudcrab_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mudcrab -d mudcrab"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mudcrab_pgdata:
+

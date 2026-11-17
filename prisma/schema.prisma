@@ -1,0 +1,422 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+enum CrabStatus {
+  ACTIVE
+  SICK
+  SOLD
+  DEAD
+}
+
+enum TrayAssignmentReason {
+  STOCKED
+  MOVED_TO_TREATMENT
+  MOVED_BACK
+  MOVED_OTHER
+}
+
+enum MoltStage {
+  PRE_MOLT
+  MOLTED
+  SOFT
+  HARDENING
+  HARD
+}
+
+enum FeedTimeSlot {
+  MORNING
+  EVENING
+  NIGHT
+}
+
+enum TreatmentOutcome {
+  ONGOING
+  RECOVERED
+  DIED
+}
+
+enum MineralPurpose {
+  SALINITY
+  MINERAL_BALANCE
+  PH_BUFFER
+}
+
+enum MineralAdditionReason {
+  SALINITY_ADJUST
+  PH_ADJUST
+  WATER_CHANGE
+  TOP_UP
+  OTHER
+}
+
+enum SystemLogType {
+  TOP_UP
+  BIOFILTER_CLEAN
+  MECHANICAL_FILTER_CLEAN
+  UV_SERVICE
+  PUMP_SERVICE
+  OTHER
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+}
+
+enum ExpenseCategory {
+  ELECTRICITY
+  LABOUR
+  EQUIPMENT
+  TRANSPORT
+  OTHER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Tray {
+  id              String           @id @default(cuid())
+  number          String           @unique
+  isTreatmentTray Boolean          @default(false)
+  active          Boolean          @default(true)
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  currentCrab     Crab?            @relation("CurrentTray")
+  assignments     TrayAssignment[]
+
+  @@index([active])
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  location  String?
+  notes     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  batches   Batch[]
+
+  @@index([active])
+}
+
+model Buyer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  location  String?
+  notes     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sales     Sale[]
+
+  @@index([active])
+}
+
+model Batch {
+  id           String   @id @default(cuid())
+  letter       String   @unique
+  supplierId   String
+  supplier     Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  purchaseDate DateTime
+  pricePerKg   Decimal? @db.Decimal(10, 2)
+  nextCrabSeq  Int      @default(1)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  crabs        Crab[]
+
+  @@index([supplierId])
+  @@index([purchaseDate])
+}
+
+model Crab {
+  id                  String           @id @default(cuid())
+  code                String           @unique
+  batchId             String
+  batch               Batch            @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  seq                 Int
+  sex                 Sex
+  initialWeightG      Float
+  purchaseCost        Decimal          @db.Decimal(10, 2)
+  stockedDate         DateTime
+  expectedHarvestDate DateTime?
+  status              CrabStatus       @default(ACTIVE)
+  currentTrayId       String?          @unique
+  currentTray         Tray?            @relation("CurrentTray", fields: [currentTrayId], references: [id], onDelete: SetNull)
+  endDate             DateTime?
+  deathCause          String?
+  finalWeightG        Float?
+  notes               String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  assignments         TrayAssignment[]
+  weightLogs          WeightLog[]
+  moltLogs            MoltLog[]
+  feedLogs            FeedLog[]
+  treatmentLogs       TreatmentLog[]
+  sale                Sale?
+
+  @@unique([batchId, seq])
+  @@index([status])
+  @@index([batchId])
+  @@index([stockedDate])
+}
+
+model TrayAssignment {
+  id        String               @id @default(cuid())
+  crabId    String
+  crab      Crab                 @relation(fields: [crabId], references: [id], onDelete: Cascade)
+  trayId    String
+  tray      Tray                 @relation(fields: [trayId], references: [id], onDelete: Restrict)
+  fromDate  DateTime
+  toDate    DateTime?
+  reason    TrayAssignmentReason
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([crabId])
+  @@index([trayId])
+  @@index([fromDate])
+}
+
+model WeightLog {
+  id        String   @id @default(cuid())
+  crabId    String
+  crab      Crab     @relation(fields: [crabId], references: [id], onDelete: Cascade)
+  date      DateTime
+  weightG   Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([crabId, date])
+}
+
+model MoltLog {
+  id           String    @id @default(cuid())
+  crabId       String
+  crab         Crab      @relation(fields: [crabId], references: [id], onDelete: Cascade)
+  date         DateTime
+  stage        MoltStage
+  weightAfterG Float?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([crabId, date])
+}
+
+model FeedType {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  costPerKg Decimal   @db.Decimal(10, 2)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  feedLogs  FeedLog[]
+
+  @@index([active])
+}
+
+model FeedLog {
+  id         String       @id @default(cuid())
+  crabId     String
+  crab       Crab         @relation(fields: [crabId], references: [id], onDelete: Cascade)
+  dateTime   DateTime
+  feedTypeId String
+  feedType   FeedType     @relation(fields: [feedTypeId], references: [id], onDelete: Restrict)
+  quantityG  Float
+  timeSlot   FeedTimeSlot
+  costAtTime Decimal      @db.Decimal(10, 2)
+  notes      String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([crabId, dateTime])
+  @@index([feedTypeId])
+  @@index([dateTime])
+}
+
+model TreatmentLog {
+  id        String           @id @default(cuid())
+  crabId    String
+  crab      Crab             @relation(fields: [crabId], references: [id], onDelete: Cascade)
+  date      DateTime
+  symptoms  String
+  diagnosis String?
+  treatment String
+  dose      String?
+  cost      Decimal          @default(0) @db.Decimal(10, 2)
+  outcome   TreatmentOutcome @default(ONGOING)
+  notes     String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([crabId, date])
+}
+
+model WaterTest {
+  id                 String   @id @default(cuid())
+  dateTime           DateTime
+  salinityPpt        Float?
+  pH                 Float?
+  ammoniaMgL         Float?
+  nitriteMgL         Float?
+  nitrateMgL         Float?
+  alkalinityMgL      Float?
+  temperatureC       Float?
+  dissolvedOxygenMgL Float?
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([dateTime])
+}
+
+model WaterChange {
+  id               String            @id @default(cuid())
+  date             DateTime
+  quantityLitres   Float
+  percentChanged   Float
+  notes            String?
+  calciumMgL       Float?
+  magnesiumMgL     Float?
+  potassiumMgL     Float?
+  sodiumMgL        Float?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  mineralAdditions MineralAddition[]
+
+  @@index([date])
+}
+
+model Mineral {
+  id           String            @id @default(cuid())
+  name         String            @unique
+  formula      String
+  purpose      MineralPurpose
+  costPerKg    Decimal           @db.Decimal(10, 2)
+  stockKg      Float?
+  active       Boolean           @default(true)
+  notes        String?
+  naFraction   Float             @default(0)
+  mgFraction   Float             @default(0)
+  caFraction   Float             @default(0)
+  kFraction    Float             @default(0)
+  clFraction   Float             @default(0)
+  so4Fraction  Float             @default(0)
+  hco3Fraction Float             @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  additions    MineralAddition[]
+
+  @@index([active])
+}
+
+model MineralAddition {
+  id            String                @id @default(cuid())
+  dateTime      DateTime
+  mineralId     String
+  mineral       Mineral               @relation(fields: [mineralId], references: [id], onDelete: Restrict)
+  quantityG     Float
+  costAtTime    Decimal               @db.Decimal(10, 2)
+  reason        MineralAdditionReason
+  waterChangeId String?
+  waterChange   WaterChange?          @relation(fields: [waterChangeId], references: [id], onDelete: Cascade)
+  notes         String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([dateTime])
+  @@index([mineralId])
+  @@index([waterChangeId])
+}
+
+model SystemLog {
+  id             String        @id @default(cuid())
+  date           DateTime
+  type           SystemLogType
+  quantityLitres Float?
+  cost           Decimal?      @db.Decimal(10, 2)
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([date])
+  @@index([type])
+}
+
+model Sale {
+  id            String        @id @default(cuid())
+  crabId        String        @unique
+  crab          Crab          @relation(fields: [crabId], references: [id], onDelete: Cascade)
+  buyerId       String
+  buyer         Buyer         @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  date          DateTime
+  weightG       Float
+  pricePerKg    Decimal       @db.Decimal(10, 2)
+  totalAmount   Decimal       @db.Decimal(12, 2)
+  paymentStatus PaymentStatus @default(PAID)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([buyerId])
+  @@index([date])
+  @@index([paymentStatus])
+}
+
+model Expense {
+  id        String          @id @default(cuid())
+  date      DateTime
+  category  ExpenseCategory
+  amount    Decimal         @db.Decimal(12, 2)
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([date])
+  @@index([category])
+}
+
+model Settings {
+  id                      Int      @id @default(1)
+  systemVolumeLitres      Float    @default(5000)
+  waterChangeWarnDays     Int      @default(90)
+  waterChangeIntervalDays Int      @default(120)
+  waterTestIntervalDays   Int      @default(1)
+  salinityMin             Float    @default(18)
+  salinityMax             Float    @default(25)
+  phMin                   Float    @default(7.6)
+  phMax                   Float    @default(8.3)
+  ammoniaMax              Float    @default(0.25)
+  nitriteMax              Float    @default(0.25)
+  nitrateMax              Float    @default(40)
+  tempMin                 Float    @default(26)
+  tempMax                 Float    @default(31)
+  targetFatteningDays     Int      @default(45)
+  lowMineralStockKg       Float    @default(2)
+  softCrabAlert           Boolean  @default(true)
+  nextBatchIndex          Int      @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
