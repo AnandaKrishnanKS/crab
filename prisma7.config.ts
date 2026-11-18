@@ -8,7 +8,10 @@ export default defineConfig({
     seed: "npx tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL_UNPOOLED"] || process.env["DATABASE_URL"],
+    url:
+      process.env["DATABASE_URL_UNPOOLED"] ||
+      process.env["DATABASE_URL"] ||
+      "postgresql://placeholder:placeholder@localhost:5432/placeholder",
     ...(process.env["SHADOW_DATABASE_URL"]
       ? { shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"] }
       : {}),

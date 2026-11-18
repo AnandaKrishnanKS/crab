@@ -1,6 +1,8 @@
 import type { NextAuthConfig } from "next-auth";
 
 export const authConfig = {
+  trustHost: true,
+  secret: process.env.AUTH_SECRET || "crab-secret-fallback-minimum-32-chars-key-2026",
   pages: {
     signIn: "/login",
   },
